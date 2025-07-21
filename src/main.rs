@@ -26,7 +26,8 @@ async fn main() {
     let http_config = config.clone();
 
     tokio::spawn(async move {
-        if let Err(e) = net::start_multicast_listener(&multicast_config).await {
+        let dispatcher = dispatch::Dispatcher::new();
+        if let Err(e) = net::start_multicast_listener(&multicast_config, dispatcher).await {
             log::error!("Failed to start multicast listener: {}", e);
             std::process::exit(1);
         }

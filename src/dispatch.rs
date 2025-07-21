@@ -3,11 +3,38 @@ use crate::proto::homelabd::Envelope;
 
 use prost::Message;
 
-pub fn dispatch(buf: &[u8]) {
-    MESSAGES_RECEIVED.inc();
+pub trait Dispatchable: Send + Sync {
+    fn name(&self) -> &'static str;
 
-    match Envelope::decode(buf) {
-        Ok(env) => log::info!("Received message: {:?}", env),
-        Err(e) => log::warn!("Failed to decode message: {}", e),
+    fn dispatch(&self, message: &Envelope);
+}
+
+pub struct Dispatcher {
+    handlers: Vec<Box<dyn Dispatchable>>,
+}
+
+impl Dispatcher {
+    pub fn new() -> Self {
+        Self {
+            handlers: Vec::new(),
+        }
+    }
+
+    pub fn register<T: Dispatchable + 'static>(&mut self, handler: T) {
+        log::info!("Registering dispatch handler: {}", handler.name());
+        self.handlers.push(Box::new(handler));
+    }
+
+    pub fn dispatch(&self, buf: &[u8]) {
+        MESSAGES_RECEIVED.inc();
+
+        match Envelope::decode(buf) {
+            Ok(env) => {
+                for handler in &self.handlers {
+                    handler.dispatch(&env);
+                }
+            }
+            Err(e) => log::warn!("Failed to decode message: {}", e),
+        }
     }
 }

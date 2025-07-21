@@ -1,4 +1,4 @@
-use crate::{config::Config, dispatch::dispatch, metrics::MESSAGES_SENT};
+use crate::{config::Config, dispatch::Dispatcher, metrics::MESSAGES_SENT};
 use bytes::Bytes;
 use log::info;
 use socket2::{Domain, Protocol, Socket, Type};
@@ -7,6 +7,7 @@ use tokio::net::UdpSocket;
 
 pub async fn start_multicast_listener(
     config: &Config,
+    dispatcher: Dispatcher,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let listen_addr: Ipv4Addr = "0.0.0.0".parse()?;
 
@@ -28,7 +29,7 @@ pub async fn start_multicast_listener(
         if let Ok((size, peer)) = socket.recv_from(&mut buf).await {
             let data = &buf[..size];
             info!("Received {} bytes from {}", size, peer);
-            dispatch(data);
+            dispatcher.dispatch(data);
         }
     }
 }
