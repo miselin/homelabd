@@ -1,0 +1,16 @@
+syntax = "proto3";
+package homelabd;
+
+message Envelope {
+  oneof msg {
+    SystemInfoMessage system_info = 1;
+    // Add more messages here...
+  }
+}
+
+message SystemInfoMessage {
+    string hostname = 1;
+    int64 uptime = 2;
+    repeated string ip = 3;
+    string homelabd_version = 4;
+}
