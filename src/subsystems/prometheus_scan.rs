@@ -1,4 +1,4 @@
-use crate::{config::Config, scheduler::Subsystem};
+use crate::{config::Config, scheduler::Schedulable};
 use log::info;
 
 pub struct PrometheusScan {
@@ -12,7 +12,7 @@ impl PrometheusScan {
 }
 
 #[async_trait::async_trait]
-impl Subsystem for PrometheusScan {
+impl Schedulable for PrometheusScan {
     fn name(&self) -> &'static str {
         "PrometheusScan"
     }

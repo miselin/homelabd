@@ -5,31 +5,31 @@ use tokio::time::{Duration, interval};
 use crate::config::Config;
 
 #[async_trait::async_trait]
-pub trait Subsystem: Send + Sync {
+pub trait Schedulable: Send + Sync {
     fn name(&self) -> &'static str;
     fn interval_seconds(&self) -> u64;
     async fn run(&self);
 }
 
 pub struct Scheduler {
-    subsystems: Vec<Arc<dyn Subsystem>>,
+    schedulables: Vec<Arc<dyn Schedulable>>,
 }
 
 impl Scheduler {
     pub fn new(_config: &Config) -> Self {
         Self {
-            subsystems: Vec::new(),
+            schedulables: Vec::new(),
         }
     }
 
-    pub fn register<T: Subsystem + 'static>(&mut self, sub: T) {
-        self.subsystems.push(Arc::new(sub));
+    pub fn register<T: Schedulable + 'static>(&mut self, sub: Arc<T>) {
+        self.schedulables.push(sub);
     }
 
     pub async fn run(self) {
         let mut handles = Vec::new();
-        for sub in self.subsystems {
-            let task = sub.clone();
+        for sub in self.schedulables {
+            let task = Arc::clone(&sub);
             handles.push(tokio::spawn(async move {
                 info!(
                     "Starting subsystem: {} with interval {}",

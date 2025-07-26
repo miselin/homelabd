@@ -1,4 +1,4 @@
-use crate::{config::Config, scheduler::Subsystem};
+use crate::{config::Config, scheduler::Schedulable};
 use log::info;
 
 pub struct SelfUpdateCheck {
@@ -12,7 +12,7 @@ impl SelfUpdateCheck {
 }
 
 #[async_trait::async_trait]
-impl Subsystem for SelfUpdateCheck {
+impl Schedulable for SelfUpdateCheck {
     fn name(&self) -> &'static str {
         "SelfUpdateCheck"
     }

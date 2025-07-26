@@ -7,7 +7,7 @@ use tokio::net::UdpSocket;
 
 pub async fn start_multicast_listener(
     config: &Config,
-    dispatcher: Dispatcher,
+    mut dispatcher: Dispatcher,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let listen_addr: Ipv4Addr = "0.0.0.0".parse()?;
 

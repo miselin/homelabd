@@ -1,7 +1,7 @@
 use crate::config::Config;
 use crate::net::send_multicast;
 use crate::proto::homelabd::{Envelope, SystemInfoMessage};
-use crate::scheduler::Subsystem;
+use crate::scheduler::Schedulable;
 use hostname::get;
 use if_addrs::get_if_addrs;
 use log::info;
@@ -25,7 +25,7 @@ impl SystemInfo {
 }
 
 #[async_trait::async_trait]
-impl Subsystem for SystemInfo {
+impl Schedulable for SystemInfo {
     fn name(&self) -> &'static str {
         "SystemInfo"
     }
