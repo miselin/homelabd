@@ -23,4 +23,8 @@ pub struct Config {
     /// Override the hostname
     #[arg(long)]
     pub hostname_override: Option<String>,
+
+    /// Enable Prometheus discover emission, if /etc/prometheus exists
+    #[arg(long, default_value_t = true)]
+    pub prometheus_discovery: bool,
 }

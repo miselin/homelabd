@@ -1,14 +1,16 @@
 use crate::config::Config;
 use crate::proto::homelabd::Envelope;
 use crate::{dispatch::Dispatchable, scheduler::Schedulable};
+use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
 use std::time;
 
 pub struct Host {
-    name: String,
-    ip: Vec<String>,
-    uptime: i64,
-    version: String,
+    pub name: String,
+    pub ip: Vec<String>,
+    pub primaryip: IpAddr,
+    pub uptime: i64,
+    pub version: String,
 }
 
 struct HostEntry {
@@ -112,6 +114,14 @@ impl HostDatabase {
             .map(|entry| entry.last_seen)
     }
 
+    pub fn hosts(&self) -> Vec<Arc<Host>> {
+        let db = self.db.lock().unwrap();
+        db.hosts()
+            .iter()
+            .map(|entry| Arc::clone(&entry.host))
+            .collect()
+    }
+
     fn evict_old_hosts(&self, max_age: time::Duration) {
         let now = time::SystemTime::now();
         let mut db = self.db.lock().unwrap();
@@ -163,16 +173,43 @@ impl Dispatchable for HostDatabase {
     fn dispatch(&self, msg: &Envelope) -> Result<(), String> {
         match &msg.msg {
             Some(crate::proto::homelabd::envelope::Msg::SystemInfo(sysinfo)) => {
+                let ips = sysinfo
+                    .ip
+                    .iter()
+                    .map(|ip| ip.parse::<IpAddr>())
+                    .filter(|res| res.is_ok())
+                    .map(|res| res.unwrap())
+                    .collect::<Vec<_>>();
+
+                if ips.is_empty() {
+                    return Err("No valid IP addresses found in system info".to_string());
+                }
+
+                let routable_ips = ips
+                    .into_iter()
+                    .filter(|&ip| !ip.is_loopback())
+                    .collect::<Vec<_>>();
+
+                if routable_ips.is_empty() {
+                    return Err("No routable IP addresses found in system info".to_string());
+                }
+
+                let primary_ip = routable_ips.first();
+                if primary_ip.is_none() {
+                    return Err("No primary IP address found in system info".to_string());
+                }
+
                 let host = Host {
                     name: sysinfo.hostname.clone(),
                     ip: sysinfo.ip.clone(),
+                    primaryip: *primary_ip.unwrap(),
                     uptime: sysinfo.uptime,
                     version: sysinfo.homelabd_version.clone(),
                 };
                 self.host_seen(host);
                 Ok(())
             }
-            _ => Err("Unsupported message type".to_string()),
+            _ => Ok(()),
         }
     }
 }
