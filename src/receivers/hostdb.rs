@@ -1,7 +1,9 @@
 use crate::config::Config;
 use crate::proto::homelabd::Envelope;
 use crate::{dispatch::Dispatchable, scheduler::Schedulable};
+use dns_lookup::lookup_addr;
 use std::net::IpAddr;
+use std::os::unix::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time;
 
@@ -14,6 +16,7 @@ pub struct Host {
 }
 
 struct HostEntry {
+    key: String,
     host: Arc<Host>,
     last_seen: time::SystemTime,
 }
@@ -75,8 +78,9 @@ impl HostDatabase {
         }
     }
 
-    pub fn host_seen(&self, host: Host) {
+    pub fn host_seen(&self, hostname: &str, host: Host) {
         let entry = HostEntry {
+            key: hostname.to_string(),
             host: Arc::new(host),
             last_seen: time::SystemTime::now(),
         };
@@ -85,14 +89,13 @@ impl HostDatabase {
 
         let (hosts, hosts_lookup) = db.pair_mut();
 
-        if let Some(index) = hosts_lookup.get(&entry.host.name) {
-            log::info!("Updating host entry for {}", entry.host.name);
+        if let Some(index) = hosts_lookup.get(hostname) {
+            log::info!("Updating host entry for {}", hostname);
             hosts[*index] = entry;
         } else {
-            let name = entry.host.name.clone();
-            log::info!("Adding new host entry for {}", name);
+            log::info!("Adding new host entry for {}", hostname);
             hosts.push(entry);
-            hosts_lookup.insert(name, hosts.len() - 1);
+            hosts_lookup.insert(hostname.to_string(), hosts.len() - 1);
         }
     }
 
@@ -131,13 +134,27 @@ impl HostDatabase {
 
         let initial_hosts = hosts.len();
 
+        for host in hosts.iter() {
+            let since = now
+                .duration_since(host.last_seen)
+                .unwrap_or(time::Duration::ZERO);
+            log::info!(
+                "Host {} last seen {} seconds ago",
+                host.host.name,
+                since.as_secs()
+            );
+            if since >= max_age {
+                log::info!("Evicting host: {}", host.host.name);
+            }
+        }
+
         hosts.retain(|entry| {
             now.duration_since(entry.last_seen)
                 .unwrap_or(time::Duration::ZERO)
                 < max_age
         });
 
-        let num_evicted = initial_hosts - hosts_lookup.len();
+        let num_evicted = initial_hosts - hosts.len();
         if num_evicted > 0 {
             log::info!("Evicted {} stale hosts", num_evicted);
         }
@@ -145,7 +162,8 @@ impl HostDatabase {
         // Rebuild the lookup table after evicting old hosts
         hosts_lookup.clear();
         for (index, entry) in hosts.iter().enumerate() {
-            hosts_lookup.insert(entry.host.name.clone(), index);
+            log::info!("Rebuilding lookup for host: {}", entry.key);
+            hosts_lookup.insert(entry.key.clone(), index);
         }
     }
 }
@@ -199,14 +217,22 @@ impl Dispatchable for HostDatabase {
                     return Err("No primary IP address found in system info".to_string());
                 }
 
+                let primary_ip = primary_ip.unwrap();
+
+                // try a reverse lookup on the IP to see if we can get a more specific hostname
+                let hostname = match lookup_addr(primary_ip) {
+                    Ok(name) => name,
+                    Err(_) => sysinfo.hostname.clone(),
+                };
+
                 let host = Host {
-                    name: sysinfo.hostname.clone(),
+                    name: hostname,
                     ip: sysinfo.ip.clone(),
-                    primaryip: *primary_ip.unwrap(),
+                    primaryip: *primary_ip,
                     uptime: sysinfo.uptime,
                     version: sysinfo.homelabd_version.clone(),
                 };
-                self.host_seen(host);
+                self.host_seen(&sysinfo.hostname, host);
                 Ok(())
             }
             _ => Ok(()),

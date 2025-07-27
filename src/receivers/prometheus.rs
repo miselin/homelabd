@@ -72,13 +72,14 @@ impl Schedulable for PrometheusEmitter {
         for exporter in my_targets.iter() {
             let mut labels = std::collections::HashMap::new();
             labels.insert("job".to_string(), exporter.job.clone());
-            labels.insert(
-                "instance".to_string(),
-                format!("{}:{}", exporter.host, exporter.port),
-            );
 
             // Get host from HostDB for its primary IP
             if let Some(host) = self.hostdb.get_host(&exporter.host) {
+                labels.insert(
+                    "instance".to_string(),
+                    format!("{}:{}", host.name, exporter.port),
+                );
+
                 targets.push(TargetGroup {
                     targets: vec![format!("{}:{}", host.primaryip, exporter.port)],
                     labels,
@@ -115,14 +116,19 @@ impl Dispatchable for PrometheusEmitter {
     fn dispatch(&self, msg: &Envelope) -> Result<(), String> {
         match &msg.msg {
             Some(crate::proto::homelabd::envelope::Msg::PrometheusDiscovery(discovery)) => {
+                // Add to self.discovered_targets, but overwrite matching entries that have the same host and job combo
                 let mut my_targets = self.discovered_targets.lock().unwrap();
-                my_targets.clear();
-                my_targets.extend(discovery.discovered_targets.iter().cloned());
-                log::info!(
-                    "Discovered {} Prometheus exporters: {:?}",
-                    my_targets.len(),
-                    my_targets
-                );
+
+                for target in &discovery.discovered_targets {
+                    if let Some(existing) = my_targets.iter_mut().find(|t| {
+                        t.host == target.host && t.job == target.job && t.port == target.port
+                    }) {
+                        *existing = target.clone();
+                    } else {
+                        my_targets.push(target.clone());
+                    }
+                }
+
                 Ok(())
             }
             _ => Ok(()),
