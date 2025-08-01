@@ -113,6 +113,12 @@ impl ExporterRegistry {
                     port: 9153,
                 },
                 ExporterCandidate {
+                    process_name: "prometheus-snmp-exporter".to_string(),
+                    // Note: legacy job name from existing configuration
+                    job: "snmp-exporter".to_string(),
+                    port: 9116,
+                },
+                ExporterCandidate {
                     process_name: "grafana".to_string(),
                     job: "grafana".to_string(),
                     port: 3000,
@@ -121,6 +127,16 @@ impl ExporterRegistry {
                     process_name: "prometheus".to_string(),
                     job: "prometheus".to_string(),
                     port: 9090,
+                },
+                ExporterCandidate {
+                    process_name: "etcd".to_string(),
+                    job: "etcd".to_string(),
+                    port: 2381,
+                },
+                ExporterCandidate {
+                    process_name: "unpoller".to_string(),
+                    job: "unifipoll".to_string(),
+                    port: 9130,
                 },
             ],
         }

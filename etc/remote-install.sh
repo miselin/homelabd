@@ -6,8 +6,13 @@ INSTALLER_USER=$1
 
 systemctl stop homelabd || true
 
-cp /home/${INSTALLER_USER}/homelabd /usr/local/bin/homelabd
-cp /home/${INSTALLER_USER}/homelabd.service /etc/systemd/system/homelabd.service
+BASE_DIR=/home/${INSTALLER_USER}
+if [ "${INSTALLER_USER}" == "root" ]; then
+    BASE_DIR="/root"
+fi
+
+cp ${BASE_DIR}/homelabd /usr/local/bin/homelabd
+cp ${BASE_DIR}/homelabd.service /etc/systemd/system/homelabd.service
 
 chmod +x /usr/local/bin/homelabd
 
