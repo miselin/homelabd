@@ -63,7 +63,10 @@ impl HttpServer {
                 let metric_families = metrics::gather();
                 let mut buffer = Vec::new();
                 encoder.encode(&metric_families, &mut buffer).unwrap();
-                Ok(Response::new(Full::new(Bytes::from(buffer))))
+                Ok(Response::builder()
+                    .header("Content-Type", "text/plain; version=0.0.4")
+                    .body(Full::new(Bytes::from(buffer)))
+                    .unwrap())
             }
             "/homelabd" => {
                 let bin =
